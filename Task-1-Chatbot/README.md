@@ -28,7 +28,7 @@ This task is part of the **CodSoft Artificial Intelligence Internship**.
 
 ## 🚀 Live Demo
 
-🔗 [Chat with the Bot](https://rohitbhagour2-dotcom.github.io/CODSOFT-Internship-Artificial-Intelligence/Task-1-Chatbot/Chatbot.html](https://rohitbhagour2-dotcom.github.io/CODSOFT-Internship-Artificial-Intelligence/Task-1-Chatbot/Chatbot.html))
+🔗 (https://rohitbhagour2-dotcom.github.io/CODSOFT-Internship-Artificial-Intelligence/Task-1-Chatbot/Chatbot.html] (https://rohitbhagour2-dotcom.github.io/CODSOFT-Internship-Artificial-Intelligence/Task-1-Chatbot/Chatbot.html))
 
 ## ▶️ How to Run Locally
 
