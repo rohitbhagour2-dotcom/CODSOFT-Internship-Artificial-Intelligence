@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tic-Tac-Toe — Unbeatable AI</title>
+<style>
+  :root{
+    --ink:#1b1b1f;
+    --paper:#f6f3ec;
+    --line:#1b1b1f;
+    --x-color:#c05a3a;
+    --o-color:#2f5d62;
+    --muted:#8a8578;
+    --win:#e8dcc5;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:var(--paper);
+    font-family:'Courier New', ui-monospace, monospace;
+    color:var(--ink);
+    padding:24px;
+  }
+  .wrap{
+    width:100%;
+    max-width:460px;
+  }
+  .eyebrow{
+    font-size:12px;
+    letter-spacing:0.28em;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin:0 0 4px 2px;
+  }
+  h1{
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size:40px;
+    font-weight:700;
+    letter-spacing:-0.01em;
+    margin:0 0 18px 0;
+    line-height:1;
+  }
+  h1 span{ color:var(--x-color); }
+
+  .status-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    margin-bottom:14px;
+    font-size:14px;
+  }
+  #status{
+    font-weight:700;
+    letter-spacing:0.02em;
+  }
+  .score{
+    color:var(--muted);
+    font-size:12px;
+  }
+
+  .board{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:0;
+    border:3px solid var(--line);
+    background:var(--line);
+    aspect-ratio:1;
+  }
+  .cell{
+    background:var(--paper);
+    border:none;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:min(14vw,64px);
+    font-weight:700;
+    cursor:pointer;
+    position:relative;
+    transition:background 0.15s ease;
+    font-family: Georgia, serif;
+  }
+  .cell:hover:not(:disabled){
+    background:#efe9db;
+  }
+  .cell:disabled{
+    cursor:default;
+  }
+  .cell.win{
+    background:var(--win);
+  }
+  .cell.x{ color:var(--x-color); }
+  .cell.o{ color:var(--o-color); }
+
+  .controls{
+    display:flex;
+    gap:10px;
+    margin-top:18px;
+    align-items:center;
+    flex-wrap:wrap;
+  }
+  .btn{
+    font-family:inherit;
+    font-size:13px;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    padding:10px 16px;
+    border:2px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    cursor:pointer;
+    transition:background 0.15s ease, color 0.15s ease;
+  }
+  .btn:hover{
+    background:var(--ink);
+    color:var(--paper);
+  }
+  .btn.primary{
+    background:var(--ink);
+    color:var(--paper);
+  }
+  .btn.primary:hover{
+    background:var(--x-color);
+    border-color:var(--x-color);
+    color:var(--paper);
+  }
+
+  .side-select{
+    margin-left:auto;
+    font-size:12px;
+    color:var(--muted);
+    display:flex;
+    gap:8px;
+    align-items:center;
+  }
+  select{
+    font-family:inherit;
+    font-size:13px;
+    border:2px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    padding:6px 8px;
+  }
+
+  footer{
+    margin-top:22px;
+    font-size:11px;
+    color:var(--muted);
+    line-height:1.5;
+    border-top:1px solid var(--muted);
+    padding-top:12px;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <p class="eyebrow">Minimax &middot; Alpha&ndash;Beta Pruning</p>
+  <h1>Tic&ndash;Tac&ndash;Toe<span>.</span></h1>
+
+  <div class="status-row">
+    <div id="status">Your move</div>
+    <div class="score">You <span id="scoreHuman">0</span> &nbsp;·&nbsp; AI <span id="scoreAI">0</span> &nbsp;·&nbsp; Draws <span id="scoreDraw">0</span></div>
+  </div>
+
+  <div class="board" id="board"></div>
+
+  <div class="controls">
+    <button class="btn primary" id="resetBtn">New Round</button>
+    <div class="side-select">
+      Play as
+      <select id="sideSelect">
+        <option value="X">X (first)</option>
+        <option value="O">O (second)</option>
+      </select>
+    </div>
+  </div>
+
+  <footer>
+    The AI searches every possible outcome with Minimax and prunes branches with Alpha&ndash;Beta pruning, so it never loses — the best you can do is force a draw.
+  </footer>
+</div>
+
+<script>
+const boardEl = document.getElementById('board');
+const statusEl = document.getElementById('status');
+const resetBtn = document.getElementById('resetBtn');
+const sideSelect = document.getElementById('sideSelect');
+const scoreHumanEl = document.getElementById('scoreHuman');
+const scoreAIEl = document.getElementById('scoreAI');
+const scoreDrawEl = document.getElementById('scoreDraw');
+
+let board, humanMark, aiMark, gameOver, cells;
+let scores = { human: 0, ai: 0, draw: 0 };
+
+const WIN_LINES = [
+  [0,1,2],[3,4,5],[6,7,8],
+  [0,3,6],[1,4,7],[2,5,8],
+  [0,4,8],[2,4,6]
+];
+
+function initGame(){
+  board = Array(9).fill(null);
+  gameOver = false;
+  humanMark = sideSelect.value;
+  aiMark = humanMark === 'X' ? 'O' : 'X';
+  boardEl.innerHTML = '';
+  cells = [];
+  for(let i=0;i<9;i++){
+    const c = document.createElement('button');
+    c.className = 'cell';
+    c.addEventListener('click', () => onCellClick(i));
+    boardEl.appendChild(c);
+    cells.push(c);
+  }
+  updateStatus('Your move');
+  if(humanMark === 'O'){
+    disableBoard(true);
+    updateStatus("AI's move");
+    setTimeout(aiMove, 350);
+  }
+}
+
+function disableBoard(disabled){
+  cells.forEach((c,i) => { c.disabled = disabled || board[i] !== null; });
+}
+
+function onCellClick(i){
+  if(gameOver || board[i] !== null) return;
+  makeMove(i, humanMark);
+  if(checkEnd()) return;
+  disableBoard(true);
+  updateStatus("AI's move");
+  setTimeout(aiMove, 350);
+}
+
+function makeMove(i, mark){
+  board[i] = mark;
+  cells[i].textContent = mark;
+  cells[i].classList.add(mark.toLowerCase());
+  cells[i].disabled = true;
+}
+
+function aiMove(){
+  if(gameOver) return;
+  const best = getBestMove(board, aiMark);
+  makeMove(best, aiMark);
+  checkEnd();
+  if(!gameOver){
+    disableBoard(false);
+    updateStatus('Your move');
+  }
+}
+
+function checkEnd(){
+  const result = evaluateBoard(board);
+  if(result.winner){
+    gameOver = true;
+    highlightWin(result.line);
+    disableBoard(true);
+    if(result.winner === humanMark){
+      scores.human++;
+      updateStatus('You win!');
+    } else {
+      scores.ai++;
+      updateStatus('AI wins');
+    }
+    updateScoreboard();
+    return true;
+  }
+  if(board.every(v => v !== null)){
+    gameOver = true;
+    scores.draw++;
+    updateScoreboard();
+    updateStatus("It's a draw");
+    return true;
+  }
+  return false;
+}
+
+function highlightWin(line){
+  if(!line) return;
+  line.forEach(i => cells[i].classList.add('win'));
+}
+
+function updateStatus(text){
+  statusEl.textContent = text;
+}
+
+function updateScoreboard(){
+  scoreHumanEl.textContent = scores.human;
+  scoreAIEl.textContent = scores.ai;
+  scoreDrawEl.textContent = scores.draw;
+}
+
+// ---- Game logic (pure functions on a board array) ----
+
+function evaluateBoard(b){
+  for(const line of WIN_LINES){
+    const [a,c,d] = line;
+    if(b[a] && b[a] === b[c] && b[a] === b[d]){
+      return { winner: b[a], line };
+    }
+  }
+  return { winner: null, line: null };
+}
+
+// Minimax with Alpha-Beta pruning.
+// Returns a score from the perspective of `aiMark`.
+function minimax(b, depth, isMaximizing, alpha, beta, aiM, humanM){
+  const { winner } = evaluateBoard(b);
+  if(winner === aiM) return 10 - depth;
+  if(winner === humanM) return depth - 10;
+  if(b.every(v => v !== null)) return 0;
+
+  if(isMaximizing){
+    let best = -Infinity;
+    for(let i=0;i<9;i++){
+      if(b[i] === null){
+        b[i] = aiM;
+        const score = minimax(b, depth+1, false, alpha, beta, aiM, humanM);
+        b[i] = null;
+        best = Math.max(best, score);
+        alpha = Math.max(alpha, score);
+        if(beta <= alpha) break;
+      }
+    }
+    return best;
+  } else {
+    let best = Infinity;
+    for(let i=0;i<9;i++){
+      if(b[i] === null){
+        b[i] = humanM;
+        const score = minimax(b, depth+1, true, alpha, beta, aiM, humanM);
+        b[i] = null;
+        best = Math.min(best, score);
+        beta = Math.min(beta, score);
+        if(beta <= alpha) break;
+      }
+    }
+    return best;
+  }
+}
+
+function getBestMove(b, aiM){
+  const humanM = aiM === 'X' ? 'O' : 'X';
+
+  // Opening-move shortcut: if board is empty, take a corner for variety/speed.
+  const empties = b.map((v,i)=>v===null?i:null).filter(v=>v!==null);
+  if(empties.length === 9){
+    const corners = [0,2,6,8];
+    return corners[Math.floor(Math.random()*corners.length)];
+  }
+
+  let bestScore = -Infinity;
+  let bestMove = empties[0];
+  for(const i of empties){
+    b[i] = aiM;
+    const score = minimax(b, 0, false, -Infinity, Infinity, aiM, humanM);
+    b[i] = null;
+    if(score > bestScore){
+      bestScore = score;
+      bestMove = i;
+    }
+  }
+  return bestMove;
+}
+
+resetBtn.addEventListener('click', initGame);
+sideSelect.addEventListener('change', initGame);
+
+initGame();
+</script>
+
+</body>
+</html>
