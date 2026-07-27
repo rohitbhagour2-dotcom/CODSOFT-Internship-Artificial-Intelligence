@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Movie Recommendation System</title>
+<style>
+  body { font-family: Arial, sans-serif; background:#f4f6f8; margin:0; padding:20px; }
+  h1 { text-align:center; color:#222; }
+  .container { max-width:900px; margin:0 auto; }
+  .card { background:#fff; border-radius:10px; padding:20px; margin-bottom:20px; box-shadow:0 2px 6px rgba(0,0,0,0.1); }
+  select, button { padding:8px 12px; font-size:14px; margin:5px 5px 5px 0; border-radius:6px; border:1px solid #ccc; }
+  button { background:#3b82f6; color:#fff; border:none; cursor:pointer; }
+  button:hover { background:#2563eb; }
+  table { width:100%; border-collapse:collapse; margin-top:10px; }
+  th, td { text-align:left; padding:8px; border-bottom:1px solid #eee; }
+  .tag { display:inline-block; background:#e0e7ff; color:#3730a3; padding:2px 8px; border-radius:12px; font-size:12px; margin:2px; }
+  .score { font-weight:bold; color:#16a34a; }
+  .tab-buttons { text-align:center; margin-bottom:15px; }
+  .tab-buttons button.active { background:#1d4ed8; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🎬 Movie Recommendation System</h1>
+
+  <div class="tab-buttons">
+    <button id="btnContent" class="active" onclick="switchTab('content')">Content-Based</button>
+    <button id="btnCollab" onclick="switchTab('collab')">Collaborative Filtering</button>
+  </div>
+
+  <!-- CONTENT BASED FILTERING -->
+  <div id="contentTab" class="card">
+    <h2>Content-Based Filtering</h2>
+    <p>Pick a movie you like, and we'll recommend similar ones based on genres.</p>
+    <select id="movieSelect"></select>
+    <button onclick="recommendContent()">Recommend</button>
+    <div id="contentResults"></div>
+  </div>
+
+  <!-- COLLABORATIVE FILTERING -->
+  <div id="collabTab" class="card" style="display:none;">
+    <h2>Collaborative Filtering (User-Based)</h2>
+    <p>Pick a user, and we'll recommend movies liked by similar users.</p>
+    <select id="userSelect"></select>
+    <button onclick="recommendCollab()">Recommend</button>
+    <div id="collabResults"></div>
+  </div>
+
+  <div class="card">
+    <h3>Dataset</h3>
+    <p>Movies:</p>
+    <table id="movieTable"></table>
+    <p>User Ratings (1-5):</p>
+    <table id="ratingTable"></table>
+  </div>
+</div>
+
+<script>
+/* ---------- Sample Dataset ---------- */
+const movies = [
+  { id: 1, title: "The Matrix", genres: ["Action","Sci-Fi"] },
+  { id: 2, title: "Inception", genres: ["Action","Sci-Fi","Thriller"] },
+  { id: 3, title: "Titanic", genres: ["Romance","Drama"] },
+  { id: 4, title: "The Notebook", genres: ["Romance","Drama"] },
+  { id: 5, title: "Interstellar", genres: ["Sci-Fi","Drama"] },
+  { id: 6, title: "John Wick", genres: ["Action","Thriller"] },
+  { id: 7, title: "La La Land", genres: ["Romance","Musical"] },
+  { id: 8, title: "The Dark Knight", genres: ["Action","Thriller","Crime"] },
+];
+
+// userId -> { movieId: rating }
+const ratings = {
+  "Alice": { 1:5, 2:4, 5:5, 6:3 },
+  "Bob":   { 3:5, 4:4, 7:5, 2:2 },
+  "Carol": { 1:4, 6:5, 8:5, 2:3 },
+  "Dave":  { 3:4, 4:5, 7:4, 5:2 },
+  "Eve":   { 1:5, 2:5, 6:4, 8:4 },
+};
+
+/* ---------- Populate UI ---------- */
+function populateSelectors() {
+  const movieSelect = document.getElementById("movieSelect");
+  movies.forEach(m => {
+    const opt = document.createElement("option");
+    opt.value = m.id;
+    opt.textContent = m.title;
+    movieSelect.appendChild(opt);
+  });
+
+  const userSelect = document.getElementById("userSelect");
+  Object.keys(ratings).forEach(u => {
+    const opt = document.createElement("option");
+    opt.value = u;
+    opt.textContent = u;
+    userSelect.appendChild(opt);
+  });
+}
+
+function renderTables() {
+  const movieTable = document.getElementById("movieTable");
+  movieTable.innerHTML = "<tr><th>ID</th><th>Title</th><th>Genres</th></tr>" +
+    movies.map(m => `<tr><td>${m.id}</td><td>${m.title}</td><td>${m.genres.map(g=>`<span class="tag">${g}</span>`).join("")}</td></tr>`).join("");
+
+  const ratingTable = document.getElementById("ratingTable");
+  let header = "<tr><th>User</th>" + movies.map(m=>`<th>${m.title}</th>`).join("") + "</tr>";
+  let rows = Object.keys(ratings).map(u => {
+    let cells = movies.map(m => `<td>${ratings[u][m.id] ?? "-"}</td>`).join("");
+    return `<tr><td>${u}</td>${cells}</tr>`;
+  }).join("");
+  ratingTable.innerHTML = header + rows;
+}
+
+function switchTab(tab) {
+  document.getElementById("contentTab").style.display = tab === "content" ? "block" : "none";
+  document.getElementById("collabTab").style.display = tab === "collab" ? "block" : "none";
+  document.getElementById("btnContent").classList.toggle("active", tab === "content");
+  document.getElementById("btnCollab").classList.toggle("active", tab === "collab");
+}
+
+/* ---------- Content-Based Filtering ---------- */
+function jaccardSimilarity(setA, setB) {
+  const a = new Set(setA), b = new Set(setB);
+  const intersection = [...a].filter(x => b.has(x)).length;
+  const union = new Set([...a, ...b]).size;
+  return union === 0 ? 0 : intersection / union;
+}
+
+function recommendContent() {
+  const selectedId = parseInt(document.getElementById("movieSelect").value);
+  const target = movies.find(m => m.id === selectedId);
+
+  const scored = movies
+    .filter(m => m.id !== selectedId)
+    .map(m => ({ ...m, score: jaccardSimilarity(target.genres, m.genres) }))
+    .sort((a, b) => b.score - a.score);
+
+  const results = document.getElementById("contentResults");
+  results.innerHTML = `<p>Because you liked <b>${target.title}</b>:</p>` +
+    "<table><tr><th>Title</th><th>Genres</th><th>Similarity</th></tr>" +
+    scored.map(m => `<tr><td>${m.title}</td><td>${m.genres.map(g=>`<span class="tag">${g}</span>`).join("")}</td><td class="score">${(m.score*100).toFixed(0)}%</td></tr>`).join("") +
+    "</table>";
+}
+
+/* ---------- Collaborative Filtering (User-Based) ---------- */
+function cosineSimilarity(userA, userB) {
+  const commonMovies = Object.keys(userA).filter(id => id in userB);
+  if (commonMovies.length === 0) return 0;
+
+  let dot = 0, magA = 0, magB = 0;
+  commonMovies.forEach(id => {
+    dot += userA[id] * userB[id];
+  });
+  Object.values(userA).forEach(v => magA += v * v);
+  Object.values(userB).forEach(v => magB += v * v);
+
+  return dot / (Math.sqrt(magA) * Math.sqrt(magB));
+}
+
+function recommendCollab() {
+  const targetUser = document.getElementById("userSelect").value;
+  const targetRatings = ratings[targetUser];
+
+  // similarity to every other user
+  const similarities = Object.keys(ratings)
+    .filter(u => u !== targetUser)
+    .map(u => ({ user: u, sim: cosineSimilarity(targetRatings, ratings[u]) }))
+    .sort((a, b) => b.sim - a.sim);
+
+  // predict scores for movies the target user hasn't rated
+  const unratedMovies = movies.filter(m => !(m.id in targetRatings));
+  const predictions = unratedMovies.map(m => {
+    let weightedSum = 0, simSum = 0;
+    similarities.forEach(({ user, sim }) => {
+      const r = ratings[user][m.id];
+      if (r !== undefined && sim > 0) {
+        weightedSum += sim * r;
+        simSum += sim;
+      }
+    });
+    const predicted = simSum > 0 ? weightedSum / simSum : 0;
+    return { ...m, predicted };
+  }).sort((a, b) => b.predicted - a.predicted);
+
+  const results = document.getElementById("collabResults");
+  results.innerHTML = `<p>Users most similar to <b>${targetUser}</b>: ${similarities.map(s=>`${s.user} (${(s.sim*100).toFixed(0)}%)`).join(", ")}</p>` +
+    "<table><tr><th>Movie</th><th>Predicted Rating</th></tr>" +
+    predictions.map(m => `<tr><td>${m.title}</td><td class="score">${m.predicted.toFixed(2)} / 5</td></tr>`).join("") +
+    "</table>";
+}
+
+populateSelectors();
+renderTables();
+</script>
+</body>
+</html>
