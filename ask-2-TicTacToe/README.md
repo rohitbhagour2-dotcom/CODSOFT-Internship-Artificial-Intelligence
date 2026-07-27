@@ -20,7 +20,7 @@ This task is part of the **CodSoft Artificial Intelligence Internship**.
 - HTML, CSS, JavaScript
 
 ## 🚀 Live Demo
-🔗 [Play Tic-Tac-Toe AI](https://rohitbhagour2-dotcom.github.io/CodSoft-Internship-Artificial-Intelligence/Task-2-TicTacToe/tictactoe.html)
+🔗 [Play Tic-Tac-Toe AI](https://rohitbhagour2-dotcom.github.io/CodSoft-Internship-Artificial-Intelligence/Task-2-TicTacToe/TictacToe.html)
 
 ## ▶️ How to Run Locally
 1. Clone this repository
